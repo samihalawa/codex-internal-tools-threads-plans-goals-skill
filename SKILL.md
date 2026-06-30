@@ -176,6 +176,10 @@ If no literal fragment is available, label the conclusion `inference`, not evide
 
 Use this when the user says `again`, `previous`, `worked before`, `what did we do`, `why did this fail`, `continue`, `finish`, `same issue`, or gives a typo-heavy request that likely refers to prior work.
 
+Continuation trigger matrix:
+- on `continue`, `again`, `previous`, `worked before`, `what did we do`, `finish`, pasted session ids, or session-artifact inputs, the first action must be `codex_app.list_threads` plus `codex_app.read_thread`
+- fall back to raw session-log search only if Codex thread tools are unavailable or insufficient
+
 1. Build 3 to 8 search terms from:
 - project or repo name
 - feature, route, model, tool, endpoint, domain, error text
@@ -255,6 +259,9 @@ Choose `create new thread` only when:
 - isolation by project or worktree is materially better
 - the existing thread is clearly inferior and steering it would create confusion
 
+Duplicate prompt suppression:
+- if the same normalized prompt appears within the last 30 minutes, or in an unarchived thread within the last 24 hours, steer the existing thread or fork a bounded subtask instead of starting over
+
 Decision output shape:
 
 ```text
@@ -277,6 +284,26 @@ Before `codex_app.create_thread` or `codex_app.send_message_to_thread`:
 
 Never have two active implementation threads on the same repo surface and same immediate blocker.
 Research-only side threads are allowed only if their scope is explicitly non-overlapping.
+One active thread should own a long-running goal per cwd and normalized objective.
+
+## Workflow: Goal Reuse Before New Goal
+
+Use this when the user starts or restarts a high-cost or long-running objective.
+
+Rule:
+- normalize the incoming goal prompt
+- search recent threads by cwd plus normalized objective
+- continue the active owner thread unless the prior one is explicitly blocked, archived, or the user asks for a new thread
+- if the blocker changed but the objective stayed the same, reuse and retitle instead of restarting
+
+## Workflow: Goal Owner Thread
+
+One active thread should own a long-running goal per cwd and objective.
+
+New prompts matching that objective should:
+- update the plan or goal in that owner thread
+- retitle it if the blocker changed
+- fork only non-overlapping work with a separate proof target
 
 ## Workflow: Recover Typo-Heavy User Intent
 
@@ -373,6 +400,9 @@ This surface was previously closed but later reopened.
 Ignore prior done or fixed claims unless re-proven.
 First read the last missing-proof inventory, current terminal or repo or live state, and only then continue from the next exact proof step.
 ```
+
+If the finish line changed but the artifact is still the same, continue the existing thread and retitle it.
+Create a new thread only when the ownership boundary changed.
 
 ## Workflow: Detect Reopened Surfaces
 
@@ -688,6 +718,33 @@ Unresolved inventory:
   missing proof: <exact missing layer>
   next probe: <exact next action>
 ```
+
+## Workflow: Automation Thread Affinity
+
+Each automation should reuse an owner thread when possible.
+
+Rule:
+- store or recover the owner thread id
+- reuse it with follow-up messages or heartbeat updates
+- create a fresh session only when the owner thread is missing, archived by policy, or explicitly rotated
+
+## Workflow: Session Artifact Resolver
+
+Use this when the prompt includes session ids, `session-export`, `codex-*.txt`, `codex-*.csv`, screenshots of prior chats, or wording like `read previous conversations`.
+
+Rule:
+- first map the artifact back to the original thread when possible
+- decide whether the correct action is continue, steer, or only then do a forensic reread
+- do not default to raw artifact rereading if the right thread can still be recovered directly
+
+## Workflow: Parent Child Thread Hygiene
+
+Every spawned child thread must declare:
+- scope
+- non-overlap boundary
+- proof target
+- parent relationship
+- explicit archive, retitle, or absorption decision once the parent absorbs or rejects the result
 
 ## Workflow: Linear Or Tracker Bridge
 
