@@ -366,6 +366,53 @@ Prior completion is unverified because the user is asking again.
 Reconstruct the best known route from this thread, then continue from current proof.
 ```
 
+Steering prompt for reopened surfaces:
+
+```text
+This surface was previously closed but later reopened.
+Ignore prior done or fixed claims unless re-proven.
+First read the last missing-proof inventory, current terminal or repo or live state, and only then continue from the next exact proof step.
+```
+
+## Workflow: Detect Reopened Surfaces
+
+Use this when a thread contains a prior closeout token such as `SHIPPED`, `Done.`, `Fixed and pushed`, or `CHECKPOINT`, and later user language such as `again`, `still`, `all addressed`, `not what I asked`, `you said`, or `previous`.
+
+Exact rule:
+- if a thread shows a prior closure token and later user pushback on the same surface, mark the surface reopened immediately
+- do not trust the prior closeout summary
+- read the latest proof layer and rebuild a small unresolved inventory before any new implementation or architecture choice
+
+Reopened-surface output shape:
+
+```text
+Reopened surface:
+- prior close token: <quoted phrase>
+- reopen signal: <quoted later user phrase>
+- current proof layer: <code-local/runtime-local/live-external/user-surface>
+- unresolved inventory: <flat list>
+```
+
+## Workflow: Aborted Turn Recovery
+
+Use this when a recovered thread contains `<turn_aborted>` or comparable interruption markers.
+
+Exact rule:
+- assume tools or commands may have partially executed
+- before continuing, inspect current terminal or process status, repo dirty state, and the last in-progress plan item
+- treat all prior work after the aborted point as partial until re-proven
+
+Minimum recovery ledger:
+
+```text
+Aborted turn recovery:
+- aborted marker: <quoted line>
+- terminal status: <running/finished/failed/unclear>
+- repo state: <clean/dirty + short note>
+- last in-progress plan item: <quoted step or missing>
+- action: <resume/restart/verify/abandon>
+```
+
 ## Workflow: Rename, Pin, Archive
 
 Use title and pin/archive tools as operational state, not decoration.
@@ -392,6 +439,13 @@ Also audit title quality:
 - title should say the actual finish line or blocker
 - avoid generic names like `continue`, `debug`, `task`, `fix`, or repo name alone
 - retitle reopened threads so the title reflects the reopened state, not the stale claimed finish
+- do not leave a reopened thread pinned under a success-shaped title
+- use a stateful format when needed: `<project>: <surface> | <state> | <next proof>`
+
+Archive safety:
+- do not archive a thread whose latest closeout is `CHECKPOINT` with missing proof debt
+- do not archive a thread whose history shows a reopened-surface signal after the most recent success-shaped claim
+- do not archive a thread with a recent `<turn_aborted>`, active terminal, active child threads, existing heartbeat or automation, or missing same-layer proof
 
 ## Workflow: Plans
 
@@ -565,6 +619,14 @@ Stop and report `CHECKPOINT` only when:
 Never loop on the same command without changing evidence, input, target, or tool.
 Never keep opening new Codex threads as a substitute for a better diagnosis.
 
+Proof taxonomy for closeout:
+- `code-local`: code or diff exists, but runtime behavior is not re-proven
+- `runtime-local`: command, test, or local runtime behavior is re-proven
+- `live-external`: deploy, provider, remote service, or external system behavior is re-proven
+- `user-surface`: the exact user-visible surface is re-proven
+
+If the promised finish line depends on a higher layer than the strongest collected proof, the closeout must be `CHECKPOINT` and must name the missing proof layer explicitly.
+
 ## Stop Gate For Codex Orchestration
 
 Before reporting `CHECKPOINT`, all of the following must be true when applicable:
@@ -598,6 +660,33 @@ Scope: <files/project/surface>
 Do not touch: <non-overlap boundary>
 Proof required: <exact layer>
 Closeout: report changed files, verification output, commit/push/deploy state if applicable.
+```
+
+Operational caps and reuse rules:
+- reuse is the default when the same project or cwd, same artifact or finish-line class, and recent activity or unresolved verification already exist
+- create a new top-level thread only when the project changed, explicit worktree isolation is needed, the proof layer is materially non-overlapping, or the prior thread is fully closed and already re-read
+- never create a new top-level thread from a generic root like `/Users/samihalawa` when a repo-local thread exists for the same work
+- allow at most one active child thread per `{project, surface, proof-layer}` tuple
+- cap live child fanout per parent at `3` unless the user explicitly asks for a wider sweep
+- if a same-scope child already exists, steer that child instead of spawning a sibling
+- treat interrupted threads as `suspect-active` until terminal status, last proof target, and child or automation state are re-read
+
+## Workflow: Carry Forward Unresolved Inventory
+
+Use this when closing as `CHECKPOINT`, blocked, or reopened.
+
+Exact rule:
+- persist a flat unresolved inventory in the closeout or steering prompt shape
+- each item should name: surface, missing proof, next exact probe
+- on reopen, read and verify that inventory first instead of re-planning from zero
+
+Inventory shape:
+
+```text
+Unresolved inventory:
+- surface: <surface>
+  missing proof: <exact missing layer>
+  next probe: <exact next action>
 ```
 
 ## Workflow: Linear Or Tracker Bridge
@@ -646,6 +735,8 @@ Source ledger:
 - read_thread: sampled | thread = <title> (<id>) | found ...
 - read_thread_terminal: full | status = ...
 - thread decision: continue/steer/new | reason = ...
+- active children: <count or none>
+- archive eligibility: <yes/no + short reason>
 - local fallback: missing/blocked/not needed
 ```
 
@@ -667,10 +758,12 @@ Outcome: <what changed or what was recovered>
 Owner thread: <id/title or none>
 Evidence read: <thread ids, terminal quote, project/tool result>
 Inference used: <none or list>
+Proof layer reached: <code-local/runtime-local/live-external/user-surface>
 Actions taken: <created/sent/renamed/pinned/archived/goal/plan/automation>
 Mutations requested: <create/rename/archive/pin/automation/handoff>
 Mutations verified: <which ones were read back>
 Higher-priority sources skipped: <none or reasons>
+Unresolved inventory: <none or flat list>
 Unverified: <only if something could not be proven>
 Next stable checkpoint: <only if work remains>
 ```
@@ -708,4 +801,5 @@ Coverage:
 - Do not send huge prompts to existing threads. Send compact finish lines and proof requirements.
 - Do not claim a tool is unavailable until `tool_search` or the active tool list has been checked.
 - Always separate observed evidence from inference when reconstructing prior work.
+- Do not archive or pin a reopened or suspect-active thread as if it were cleanly finished.
 - Do not drift into exhaustive cross-source history crawling when nearest-thread recovery already answers the next action.
