@@ -11,6 +11,42 @@ Use this skill when the user asks to coordinate Codex work across threads, inspe
 
 This is a Codex-app orchestration skill. It favors callable Codex tools first, then local session logs and memory sources as fallback evidence.
 
+## Call Triggers
+
+Call this skill when the user asks for any of these:
+
+- list, inspect, search, open, rename, pin, archive, hand off, or continue Codex threads
+- create a new task in another project or worktree
+- compare previous attempts before deciding what to do now
+- recover what worked or failed in earlier Codex sessions
+- use `read_thread_terminal` to understand current command status
+- update plans, goals, thread titles, automations, or follow-up tasks
+- orchestrate multiple Codex threads without overlapping implementation work
+- avoid drifting, re-solving, token waste, false closure, or duplicate background tasks
+- convert typo-heavy user intent into a concrete thread orchestration workflow
+
+Do not call this skill for a single local code edit unless prior-thread recovery, Codex orchestration, goal state, or thread management is actually part of the task.
+
+## Intended Behavior Change
+
+This skill changes agent behavior in four ways:
+
+- It makes prior Codex thread evidence a first-class source before new architecture, fallback, or implementation choices.
+- It makes thread/project tools the default interface for Codex orchestration instead of raw session-log edits.
+- It turns plans, goals, titles, pins, archives, and automations into explicit state-management tools rather than afterthoughts.
+- It forces a coverage ledger so the agent can say what was searched, what was read, what was missing, and what remains unverified.
+
+## Inefficiencies This Skill Fights
+
+- repeated rediscovery of a working command, endpoint, profile, branch, or deploy route
+- token waste from rereading irrelevant history while missing the closest prior thread
+- false finishes based on agent summaries instead of `read_thread`, terminal, repo, or provider proof
+- duplicate Codex threads for the same task
+- stale thread titles that hide active blockers or finished work
+- orphaned background tasks with no plan item, proof target, or archive decision
+- tool amnesia where callable Codex tools are forgotten and weaker local fallbacks are used first
+- user-intent drift caused by typo-heavy or voice-transcribed requests being read literally instead of reconstructed from context
+
 ## Core Principle
 
 Before inventing a new route, inspect the closest prior route. A previous Codex thread, terminal output, project task, or automation may already contain the working command, failing layer, deploy proof, or exact dead end. Use that evidence to choose the next action.
@@ -59,6 +95,9 @@ Use exact tool names when available. If a tool is missing, use the fallback in t
 - `functions.view_image`: inspect local images when visual proof matters.
 - `multi_tool_use.parallel`: run independent reads/searches in parallel.
 - `tool_search.tool_search_tool`: discover lazily loaded Codex, app, connector, MCP, and plugin tools before declaring a tool unavailable.
+- `functions.list_available_plugins_to_install`: list installable plugins/connectors only after the user explicitly requests a missing one.
+- `functions.request_plugin_install`: request installation only after a matching plugin/connector is found.
+- `functions.list_mcp_resources`, `functions.list_mcp_resource_templates`, `functions.read_mcp_resource`: inspect MCP resources when a connector or app exposes durable context and `tool_search` is not the right interface.
 
 ### Common Adjacent Tools
 
@@ -109,6 +148,28 @@ rg -n "KEYWORD|error text|repo name|feature name" ~/.codex/sessions ~/.codex/mem
 ```
 
 Then open the selected `rollout-*.jsonl` directly and quote the lines used.
+
+## Workflow: Recover Typo-Heavy User Intent
+
+Use this when the user's wording is distorted but the direction is clear.
+
+1. Preserve a short raw fragment.
+2. Normalize it into plain intent.
+3. Identify likely requested actions.
+4. Identify what would be costly if misunderstood.
+5. Search similar threads or current repo state before asking the user.
+
+Output shape:
+
+```text
+Raw intent fragment: <short quote>
+Normalized intent: <what the user likely wants>
+Expected result: <artifact/action/proof>
+Risk if wrong: <costly ambiguity or none>
+First proof action: <thread search, terminal read, repo check, or project list>
+```
+
+Ask a clarification only when the remaining ambiguity is external, undiscoverable, and costly.
 
 ## Workflow: Read The Current Thread Terminal
 
@@ -281,6 +342,49 @@ Next action: <same-layer probe or execution>
 
 Do not turn one failure into a permanent unavailable state. Try three distinct approaches and at least two evidence layers before gating or removing a capability.
 
+## Workflow: Error-Line And Structured-Input Analysis
+
+Use this when the prior thread, terminal, uploaded file, CSV, JSONL, table, import, or batch task contains erroneous rows or line-specific failures.
+
+1. Read the real file or output shape first. Do not assume columns, fields, or delimiters.
+2. Isolate failing lines or records with line numbers, row ids, or stable keys.
+3. For each failing line, produce:
+- `line/key`
+- `raw observed value`
+- `expected shape`
+- `why it fails`
+- `fix or routing decision`
+- `whether similar rows must be swept`
+
+4. Sweep sibling rows with the same failure pattern.
+5. Re-run the parser/import/batch proof at the same layer.
+
+Exit the analysis loop only when:
+- all known erroneous lines have a decision,
+- the rerun proves no same-class failures remain, or
+- a specific external blocker is named with the next exact proof/action.
+
+Do not hide a malformed row behind a generic "invalid CSV" summary when a line-by-line diagnosis is feasible.
+
+## Workflow: Exit Loops And Stop Conditions
+
+Use explicit loop exits for recovery, orchestration, and verification tasks.
+
+Continue looping while:
+- a reachable proof action remains,
+- the current result contradicts the promised finish line,
+- thread search found an unverified working route,
+- a background thread is still running and can be read,
+- or sibling failures are likely and cheap to sweep.
+
+Stop and report `CHECKPOINT` only when:
+- the next step requires user input that cannot be discovered,
+- three distinct realistic approaches have failed at the same layer,
+- the required tool is missing after `tool_search` and a local fallback,
+- or the remaining proof is external and not currently accessible.
+
+Never loop on the same command without changing evidence, input, target, or tool.
+
 ## Workflow: Orchestrate Multiple Threads
 
 Use for independent, non-overlapping tasks. Do not spawn overlapping implementation threads on the same files or same immediate blocker.
@@ -363,6 +467,24 @@ Evidence read: <thread ids, terminal quote, project/tool result>
 Actions taken: <created/sent/renamed/pinned/archived/goal/plan/automation>
 Unverified: <only if something could not be proven>
 Next stable checkpoint: <only if work remains>
+```
+
+### Coverage Confirmation
+
+Use this when the user asks whether every prompt point was addressed.
+
+```text
+Coverage:
+- call triggers: addressed by <section/proof>
+- behavior impact: addressed by <section/proof>
+- inefficiencies reduced: addressed by <section/proof>
+- tool inventory: addressed by <section/proof>
+- prior-thread recovery: addressed by <section/proof>
+- terminal recovery: addressed by <section/proof>
+- orchestration: addressed by <section/proof>
+- plans/goals/titles: addressed by <section/proof>
+- loop exits/error-line analysis: addressed by <section/proof>
+- deploy/install proof: addressed by <command/result>
 ```
 
 ## Guardrails
