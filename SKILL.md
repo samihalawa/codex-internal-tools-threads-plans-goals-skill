@@ -453,6 +453,12 @@ Thread title format:
 <project/surface>: <finish line or current blocker>
 ```
 
+Preferred stateful format for active lanes:
+
+```text
+<project> | <lane> | <truth state>
+```
+
 Examples:
 - `Oulang payments: verify recharge return live`
 - `AutoPricing proposal: export print-ready PDF`
@@ -471,11 +477,17 @@ Also audit title quality:
 - retitle reopened threads so the title reflects the reopened state, not the stale claimed finish
 - do not leave a reopened thread pinned under a success-shaped title
 - use a stateful format when needed: `<project>: <surface> | <state> | <next proof>`
+- retitle a thread as soon as the dominant blocker changes
+- if a thread is retitled more than once in the same day, the next title must include the remaining blocker explicitly
 
 Archive safety:
 - do not archive a thread whose latest closeout is `CHECKPOINT` with missing proof debt
 - do not archive a thread whose history shows a reopened-surface signal after the most recent success-shaped claim
 - do not archive a thread with a recent `<turn_aborted>`, active terminal, active child threads, existing heartbeat or automation, or missing same-layer proof
+
+Pin budget:
+- pin only active coordinator threads or live blocker lanes
+- default pin budget: no more than 5 active pins per project cluster
 
 ## Workflow: Plans
 
@@ -522,6 +534,26 @@ Non-goals: <scope boundaries>
 Proof layer: <repo/test/live/DB/thread/provider>
 ```
 
+Goal rules:
+- before `functions.create_goal`, always call `functions.get_goal`
+- if an active goal already covers the surface, do not create a second overlapping goal without explicitly superseding or splitting the lane
+- do not create goals with vague phrases like `determine what is missing`, `finish the project`, or `complete everything` unless the rest of the objective names the exact surface and proof layer
+- prefer `verb + exact surface + proof + stop condition`
+
+## Workflow: Goal Triage Before Create
+
+Before `functions.create_goal`, require:
+- `functions.get_goal`
+- thread search and read when the ask is clearly a continuation
+- an explicit choice among: continue current goal, supersede current goal, split into a dedicated lane thread, or use a heartbeat
+
+## Workflow: Goal Supersession
+
+When a new user ask overlaps an old goal:
+- continue the same goal if the artifact and finish line are still materially the same
+- supersede the old goal if the dominant surface or proof layer changed
+- split into a dedicated lane only when the work is non-overlapping and durable enough to deserve its own owner thread
+
 ## Workflow: Automations And Heartbeats
 
 Use `codex_app.automation_update` when the user asks to:
@@ -532,6 +564,11 @@ Use `codex_app.automation_update` when the user asks to:
 
 Prefer heartbeat automations for follow-ups attached to the current thread, especially below one hour. Prefer cron automations for standalone repeated jobs against workspaces.
 
+External wait to heartbeat:
+- if the blocker is time-gated or provider-gated for more than about 1 hour, prefer an honest title update plus a heartbeat automation instead of repeatedly ending with `blocked`
+- when updating an automation, preserve `targetThreadId`, cadence intent, and proof requirement unless the user explicitly changes them
+- after a successful heartbeat-triggered continuation, decide whether to delete the automation and whether the thread should be archived, unpinned, or retitled
+
 Before creating a duplicate, inspect existing automation files when possible:
 
 ```bash
@@ -539,6 +576,12 @@ find "$CODEX_HOME/automations" -name automation.toml -maxdepth 3 2>/dev/null
 ```
 
 Preserve existing fields when updating an automation.
+
+Every heartbeat automation prompt should include:
+- exact proof source
+- retry condition
+- stop or delete condition
+- what must remain unclaimed until re-verified
 
 ## Workflow: Handoff
 
@@ -700,6 +743,11 @@ Operational caps and reuse rules:
 - cap live child fanout per parent at `3` unless the user explicitly asks for a wider sweep
 - if a same-scope child already exists, steer that child instead of spawning a sibling
 - treat interrupted threads as `suspect-active` until terminal status, last proof target, and child or automation state are re-read
+
+Lane split and coordinator cleanup:
+- when a dedicated lane thread is created, immediately decide whether the parent stays coordinator, stays primary, or should be archived
+- archive superseded lanes
+- pin only the active coordinator plus the 1 to 3 hottest lanes
 
 ## Workflow: Carry Forward Unresolved Inventory
 
