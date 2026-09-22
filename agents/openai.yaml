@@ -1,4 +1,4 @@
 interface:
-  display_name: "Codex Internal Tools Threads Plans Goals"
-  short_description: "Use the smallest Codex-native operation for tasks, threads, terminals, plans, goals, and automations."
-  default_prompt: "Use $codex-internal-tools-threads-plans-goals-skill only when the request explicitly concerns Codex tasks, projects, terminals, plans, goals, automations, or materially depends on a prior Codex task. Prefer the smallest native tool call, recover only enough history for the next action, resolve discoverable IDs internally, avoid duplicate tasks and ceremonial ledgers, preserve current user authority, execute the requested work, and read back mutations before reporting them."
+  display_name: "Codex and ChatGPT App Tools"
+  short_description: "Route and verify the complete current Codex/ChatGPT task, project, sidebar, worktree, automation, and app-tool surface."
+  default_prompt: "Use $codex-internal-tools-threads-plans-goals-skill when the request explicitly concerns Codex or ChatGPT tasks, projects, sidebar sections, terminals, reviews, worktrees, handoffs, artifacts, automations, environments, onboarding, voice, usage, plans, goals, or materially depends on prior task state. Inspect the active full tool schema first, choose the smallest exact native operation, resolve discoverable IDs internally, distinguish project assignment from cwd, handoff, and sidebar placement, avoid duplicate tasks, preserve user authority, and prove every mutation with native read-back before reporting it."
